@@ -1,0 +1,99 @@
+{
+  "products": [
+    {
+      "id": "4",
+      "title": "Quần áo nam HIDDLE",
+      "price": 200,
+      "image": "https://bizweb.dktcdn.net/thumb/large/100/399/392/products/ao-khoac-jean-nam-tinh-chinh-hang-hiddle-8.jpg?v=1741754139623aker/120/120",
+      "category": "Áo",
+      "description": "Portable, waterproof, deep bass."
+    },
+    {
+      "id": "da21",
+      "title": "Áo sơ mi nam cổ bẻ tay dài Modern Comfort",
+      "price": 12000,
+      "image": "https://cdn.hstatic.net/products/200001014864/k11000_lmt010004207665_1_cb5f7b8b05ec42f7b904d63e96ae6ff6_5874a21fc7b5444cae807669628b1b7a.jpg",
+      "category": "Áo",
+      "description": "rgdgde"
+    },
+    {
+      "id": "db7c",
+      "title": "Quần yếm nữ denim Modern Dungaree",
+      "price": 12000,
+      "image": "https://cdn.hstatic.net/products/200001014864/a07935_lwb007752203487_1_e43eff8883c24b24ac174e0837ae8fd8_c091b0751a7f45eca42534f540a7a7c1.jpg",
+      "category": "Quần",
+      "description": "ưyheu"
+    }
+  ],
+  "users": [
+    {
+      "name": "admin",
+      "username": "admin",
+      "password": "12356",
+      "role": "admin",
+      "id": "052f"
+    },
+    {
+      "name": "admin",
+      "username": "admin",
+      "password": "12356",
+      "role": "admin",
+      "id": "511f"
+    },
+    {
+      "id": "6ece",
+      "username": "hoang",
+      "password": "123456"
+    },
+    {
+      "id": "6bf7",
+      "username": "haha",
+      "password": "1234567"
+    },
+    {
+      "id": "fabd",
+      "username": "ggg",
+      "password": "1234567",
+      "role": "user"
+    },
+    {
+      "id": "d7b2",
+      "username": "ga",
+      "password": "123456",
+      "role": "user"
+    },
+    {
+      "id": "e85a",
+      "username": "hahaaa",
+      "password": "12345678",
+      "role": "user"
+    },
+    {
+      "id": "4f1a",
+      "username": "hoàng ",
+      "password": "12345",
+      "role": "user"
+    },
+    {
+      "id": "f58e",
+      "username": "hihi",
+      "password": "123456",
+      "role": "user"
+    }
+  ],
+  "comments": [
+    {
+      "id": "1",
+      "text": "a comment about post 1",
+      "postId": null
+    },
+    {
+      "id": "2",
+      "text": "another comment about post 1",
+      "postId": null
+    }
+  ],
+  "profile": {
+    "name": "typicode"
+  }
+}
