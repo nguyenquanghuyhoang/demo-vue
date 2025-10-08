@@ -11,7 +11,7 @@ import admin from './lab4/admin.vue'
 import Profile from './lab4/profile.vue'
 
 const routes = [
-  { path: '/', name: 'Home', component: ListPostView, meta: { isAuth: false } },
+  { path: '/', name: 'Home', component: PostList, meta: { isAuth: false } },
   { path: '/posts', name: 'Posts', component: ListPostView, meta: { isAuth: false } },
   { path: '/posts/:id', name: 'PostDetail', component: PostDetailView, meta: { isAuth: false } },
   { path: '/login', name: 'Login', component: Login, meta: { isAuth: false } },

@@ -1,14 +1,6 @@
 {
   "products": [
     {
-      "id": "4",
-      "title": "Quần áo nam HIDDLE",
-      "price": 200,
-      "image": "https://bizweb.dktcdn.net/thumb/large/100/399/392/products/ao-khoac-jean-nam-tinh-chinh-hang-hiddle-8.jpg?v=1741754139623aker/120/120",
-      "category": "Áo",
-      "description": "Portable, waterproof, deep bass."
-    },
-    {
       "id": "da21",
       "title": "Áo sơ mi nam cổ bẻ tay dài Modern Comfort",
       "price": 12000,
@@ -17,12 +9,28 @@
       "description": "rgdgde"
     },
     {
-      "id": "db7c",
-      "title": "Quần yếm nữ denim Modern Dungaree",
+      "id": "2975",
+      "title": "áo ",
       "price": 12000,
-      "image": "https://cdn.hstatic.net/products/200001014864/a07935_lwb007752203487_1_e43eff8883c24b24ac174e0837ae8fd8_c091b0751a7f45eca42534f540a7a7c1.jpg",
-      "category": "Quần",
-      "description": "ưyheu"
+      "image": "https://thoitrangbigsize.vn/wp-content/uploads/2025/04/Ao-so-mi-cong-so-301-mau-trang.jpg",
+      "category": "Áo",
+      "description": "svz"
+    },
+    {
+      "id": "8808",
+      "title": "áo",
+      "price": 12000,
+      "image": "https://thoitrangbigsize.vn/wp-content/uploads/2025/04/Ao-so-mi-cong-so-mau-xam-308.jpg",
+      "category": "Electronics",
+      "description": "đẹp"
+    },
+    {
+      "id": "262c",
+      "title": "Áo",
+      "price": 12000,
+      "image": "https://thoitrangbigsize.vn/wp-content/uploads/2025/04/Ao-so-mi-cong-so-xanh-la-cay-304.jpghttps://thoitrangbigsize.vn/wp-content/uploads/2025/04/%E8%AF%A6%E6%83%85-14-2.jpg",
+      "category": "Áo",
+      "description": "gsdg"
     }
   ],
   "users": [
@@ -78,6 +86,12 @@
       "id": "f58e",
       "username": "hihi",
       "password": "123456",
+      "role": "user"
+    },
+    {
+      "id": "9aec",
+      "username": "hoàng",
+      "password": "12345",
       "role": "user"
     }
   ],

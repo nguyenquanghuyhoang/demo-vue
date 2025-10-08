@@ -6,7 +6,7 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const products = ref([])
 const product = reactive({
-  id: null,
+  id: '',
   title: '',
   price: '',
   image: '',
@@ -44,13 +44,15 @@ const LoadProducts = async () => {
 
 const handleSubmit = async () => {
   if (!product.title.trim()) return alert('Vui lòng nhập tên sản phẩm!')
-  const payload = { ...product }
   try {
     if (product.id) {
-      await axios.put(`http://localhost:3000/products/${product.id}`, payload)
+      // Cập nhật sản phẩm có sẵn
+      await axios.put(`http://localhost:3000/products/${product.id}`, { ...product })
       alert('Cập nhật thành công!')
     } else {
-      await axios.post('http://localhost:3000/products', payload)
+      // Thêm mới: loại bỏ id để JSON Server tự tăng
+      const { id, ...newProduct } = product
+      await axios.post('http://localhost:3000/products', newProduct)
       alert('Thêm mới thành công!')
     }
     clearForm()
@@ -74,7 +76,7 @@ const editProduct = (item) => {
 
 const clearForm = () => {
   Object.assign(product, {
-    id: null,
+    id: '',
     title: '',
     price: '',
     image: '',
