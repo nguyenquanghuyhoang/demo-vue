@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import store from '@/store'
 
 const router = useRouter()
 const username = ref('')
@@ -13,14 +14,24 @@ const checkLogin = async (username, password) => {
   try {
     const response = await axios.get('http://localhost:3000/users')
     if (response.status === 200) {
-      // tìm user trùng username & password
       const user = response.data.find(
         (item) => item.username === username && item.password === password
       )
       if (user) {
-        // lưu thông tin user (có cả role nếu DB có)
         localStorage.setItem('user', JSON.stringify(user))
-        localStorage.setItem('token', user.token || '') // nếu có token thì lưu
+        localStorage.setItem('token', user.token || '')
+
+        store.commit('setUser', user)
+        const cartKey = `cart_${user.email}`
+        const savedCart = localStorage.getItem(cartKey)
+        if (savedCart) {
+          const cartItems = JSON.parse(savedCart)
+          cartItems.forEach(item => store.commit('addToCart', item))
+          console.log(`Đã load giỏ hàng cho ${user.email}`)
+        } else {
+          console.log(`Giỏ hàng trống cho ${user.email}`)
+        }
+
         return true
       }
     }
@@ -64,18 +75,8 @@ const handleDangKy = () => {
     <div class="login-box">
       <h2>Đăng Nhập</h2>
       <form @submit.prevent="handleDangNhap">
-        <input
-          type="text"
-          v-model="username"
-          placeholder="Tên đăng nhập"
-          class="input-field"
-        />
-        <input
-          type="password"
-          v-model="password"
-          placeholder="Mật khẩu"
-          class="input-field"
-        />
+        <input type="text" v-model="username" placeholder="Tên đăng nhập" class="input-field" />
+        <input type="password" v-model="password" placeholder="Mật khẩu" class="input-field" />
         <button type="submit" class="btn-login">Đăng Nhập</button>
       </form>
 
@@ -95,7 +96,6 @@ const handleDangKy = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-
 }
 
 .login-box {

@@ -1,19 +1,48 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const products = ref([])
+const categories = ref([])
 const product = reactive({
   id: '',
   title: '',
   price: '',
   image: '',
   category: '',
-  description: ''
+  description: '',
+  stock: 0 
 })
 const user = ref(null)
+let reloadInterval = null 
+const LoadProducts = async () => {
+  try {
+    const res = await axios.get('http://localhost:3000/products', {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      },
+      params: { t: Date.now() }
+    })
+    products.value = res.data
+    console.log('Đã tải lại danh sách sản phẩm:', new Date().toLocaleTimeString())
+  } catch (err) {
+    console.error('Lỗi tải sản phẩm:', err)
+  }
+}
+const LoadCategories = async () => {
+  try {
+    const res = await axios.get('http://localhost:3000/categories', {
+      headers: { 'Cache-Control': 'no-cache' }
+    })
+    categories.value = res.data
+  } catch (err) {
+    console.error('Không thể tải danh mục:', err)
+  }
+}
 
 onMounted(async () => {
   const userData = localStorage.getItem('user')
@@ -30,33 +59,37 @@ onMounted(async () => {
     return
   }
 
-  LoadProducts()
+  await LoadProducts()
+  await LoadCategories()
+  reloadInterval = setInterval(() => {
+    LoadProducts()
+  }, 5000)
 })
 
-const LoadProducts = async () => {
-  try {
-    const res = await axios.get('http://localhost:3000/products')
-    products.value = res.data
-  } catch (err) {
-    console.error(err)
-  }
-}
+onBeforeUnmount(() => {
+  if (reloadInterval) clearInterval(reloadInterval)
+})
 
 const handleSubmit = async () => {
   if (!product.title.trim()) return alert('Vui lòng nhập tên sản phẩm!')
+  if (product.price <= 0) return alert('Giá phải lớn hơn 0!')
+  if (product.stock < 0) return alert('Số lượng tồn không hợp lệ!')
+
   try {
     if (product.id) {
-      // Cập nhật sản phẩm có sẵn
       await axios.put(`http://localhost:3000/products/${product.id}`, { ...product })
       alert('Cập nhật thành công!')
     } else {
-      // Thêm mới: loại bỏ id để JSON Server tự tăng
       const { id, ...newProduct } = product
       await axios.post('http://localhost:3000/products', newProduct)
       alert('Thêm mới thành công!')
     }
+
     clearForm()
-    LoadProducts()
+    await LoadProducts()
+    localStorage.setItem('products', JSON.stringify(products.value))
+    console.log("💾 Đã cập nhật localStorage sau khi thêm/sửa sản phẩm.")
+    
   } catch (err) {
     console.error(err)
   }
@@ -81,24 +114,28 @@ const clearForm = () => {
     price: '',
     image: '',
     category: '',
-    description: ''
+    description: '',
+    stock: 0
   })
 }
 </script>
 
+
+
 <template>
   <div class="admin-wrapper">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <h3>Admin Panel</h3>
       <nav>
-        <a href="#" class="active">Sản phẩm</a>
-        <a href="#">Danh mục</a>
-        <a href="/postlist">Trang chủ</a>
+        <RouterLink to="/admin" active-class="active">Sản phẩm</RouterLink>
+        <RouterLink to="/quanliuser" active-class="active">Người dùng</RouterLink>
+        <RouterLink to="/danhmuc" active-class="active">Danh mục</RouterLink>
+        <RouterLink to="/orderAdmin" active-class="active">Quản lý đơn hàng</RouterLink>
+        <RouterLink to="/thongke" active-class="active">Thống kê</RouterLink>
+        <RouterLink to="/postlist" active-class="active">Trang chủ</RouterLink>
       </nav>
     </aside>
 
-    <!-- Nội dung chính -->
     <main class="main-content">
       <h2>Quản lý sản phẩm</h2>
 
@@ -109,15 +146,24 @@ const clearForm = () => {
           <div class="form-grid">
             <input v-model="product.title" placeholder="Tên sản phẩm" required>
             <input v-model="product.price" type="number" min="0" placeholder="Giá (VNĐ)" required>
+
             <select v-model="product.category" required>
               <option disabled value="">Chọn danh mục</option>
-              <option>Áo</option>
-              <option>Quần</option>
-              <option>Phụ kiện</option>
-              <option>Giày</option>
+              <option v-for="cate in categories" :key="cate.id" :value="cate.name">
+                {{ cate.name }}
+              </option>
             </select>
+
             <input v-model="product.image" placeholder="Link ảnh sản phẩm" required>
+            <input
+              v-model.number="product.stock"
+              type="number"
+              min="0"
+              placeholder="Số lượng tồn kho"
+              required
+            />
           </div>
+
           <textarea v-model="product.description" rows="3" placeholder="Mô tả sản phẩm..."></textarea>
           <div class="btn-group">
             <button type="submit" class="btn-save">{{ product.id ? "Cập nhật" : "Thêm mới" }}</button>
@@ -130,6 +176,7 @@ const clearForm = () => {
           <h5>Danh sách sản phẩm</h5>
           <span class="count">{{ products.length }} sản phẩm</span>
         </div>
+
         <table>
           <thead>
             <tr>
@@ -137,6 +184,7 @@ const clearForm = () => {
               <th>Tên sản phẩm</th>
               <th>Danh mục</th>
               <th>Giá</th>
+              <th>Tồn kho</th>
               <th>Hành động</th>
             </tr>
           </thead>
@@ -146,6 +194,14 @@ const clearForm = () => {
               <td>{{ item.title }}</td>
               <td><span class="tag">{{ item.category }}</span></td>
               <td class="price">{{ item.price.toLocaleString() }}đ</td>
+              <td>
+                <span v-if="item.stock === 0" class="text-danger fw-bold">Hết hàng</span>
+                <span v-else-if="item.stock < 5" class="text-warning fw-bold">
+                  Sắp hết ({{ item.stock }})
+                </span>
+                <span v-else>{{ item.stock }}</span>
+              </td>
+
               <td>
                 <button class="btn-edit" @click="editProduct(item)">Sửa</button>
                 <button class="btn-delete" @click="handleDelete(item.id)">Xóa</button>
@@ -166,10 +222,11 @@ const clearForm = () => {
   color: #333;
   font-family: 'Inter', sans-serif;
 }
+
 .sidebar {
   width: 230px;
   background: #ffffff;
-  box-shadow: 2px 0 10px rgba(0,0,0,0.08);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.08);
   padding: 30px 20px;
   display: flex;
   flex-direction: column;
@@ -203,6 +260,7 @@ const clearForm = () => {
   background-color: #3b5bdb;
   color: white;
 }
+
 .main-content {
   flex: 1;
   padding: 40px 50px;
@@ -213,13 +271,15 @@ const clearForm = () => {
   font-weight: 700;
   margin-bottom: 25px;
 }
+
 .card {
   background: white;
   border-radius: 16px;
   padding: 25px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   margin-bottom: 30px;
 }
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -227,7 +287,9 @@ const clearForm = () => {
   margin-bottom: 15px;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   border: 1px solid #d0d7e2;
   border-radius: 10px;
   padding: 10px 12px;
@@ -236,9 +298,11 @@ input, select, textarea {
   font-size: 0.95rem;
 }
 
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
   border-color: #3b5bdb;
-  box-shadow: 0 0 0 2px rgba(59,91,219,0.15);
+  box-shadow: 0 0 0 2px rgba(59, 91, 219, 0.15);
 }
 
 .btn-group {
@@ -273,6 +337,7 @@ input:focus, select:focus, textarea:focus {
 .btn-clear:hover {
   background: #cfd6e8;
 }
+
 .table-card table {
   width: 100%;
   border-collapse: collapse;
@@ -301,7 +366,7 @@ input:focus, select:focus, textarea:focus {
   height: 55px;
   border-radius: 10px;
   object-fit: cover;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .price {

@@ -1,12 +1,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-
+import axios from 'axios'
 const router = useRouter()
 const user = ref({
+  id: '',
   username: '',
   email: '',
   role: '',
+  tuoi: '',
+  gioitinh: '',
+  sanpham: '',
   avatar: 'https://i.pravatar.cc/150?img=12'
 })
 
@@ -16,7 +20,36 @@ onMounted(() => {
     user.value = JSON.parse(userData)
   }
 })
+const handleSave = async () => {
+  if (!user.value.username || !user.value.email) {
+    alert('Vui lòng nhập đầy đủ tên và email!')
+    return
+  }
 
+  try {
+
+    await axios.put(`http://localhost:3000/users/${user.value.id}`, user.value)
+    localStorage.setItem('user', JSON.stringify(user.value))
+    alert('Cập nhật hồ sơ thành công!')
+  } catch (error) {
+    console.error('Lỗi khi cập nhật user:', error)
+    alert('Không thể lưu hồ sơ. Kiểm tra server JSON!')
+  }
+}
+const handleDelete = async () => {
+  const confirmDel = confirm('Bạn có chắc muốn xóa hồ sơ này không?')
+  if (!confirmDel) return
+
+  try {
+    await axios.delete(`http://localhost:3000/users/${user.value.id}`)
+    localStorage.removeItem('user')
+    alert('Đã xóa hồ sơ thành công!')
+    router.push('/login')
+  } catch (error) {
+    console.error('Lỗi khi xóa user:', error)
+    alert('Không thể xóa hồ sơ. Kiểm tra server JSON!')
+  }
+}
 const handleLogout = () => {
   const confirmLogout = confirm('Bạn có chắc muốn đăng xuất không?')
   if (confirmLogout) {
@@ -24,11 +57,6 @@ const handleLogout = () => {
     localStorage.removeItem('token')
     router.push('/login')
   }
-}
-
-const handleUpdate = () => {
-  localStorage.setItem('user', JSON.stringify(user.value))
-  alert(' Cập nhật hồ sơ thành công!')
 }
 
 const handleAvatarChange = (event) => {
@@ -45,33 +73,30 @@ const handleAvatarChange = (event) => {
 
 <template>
   <div class="admin-wrapper">
-    <!-- Sidebar -->
+
     <aside class="sidebar">
-      <h3>Admin Panel</h3>
+      <h3>Người dùng</h3>
       <nav>
-        <a href="#" class="active">Sản phẩm</a>
-        <a href="#">Danh mục</a>
-        <a href="/postlist">Trang chủ</a>
+        <RouterLink to="/profile" class="nav-link">Hồ sơ</RouterLink>
+        <RouterLink to="/FavoriteView" class="nav-link">Danh sách yêu thích</RouterLink>
+        <RouterLink to="/donhang" class="nav-link">Đơn hàng</RouterLink>
+        <RouterLink to="/postlist" class="nav-link">Trang chủ</RouterLink>
       </nav>
     </aside>
 
-    <!-- Nội dung chính -->
     <main class="content-area">
       <div class="profile-container">
         <div class="profile-card">
-          <!-- Ảnh đại diện -->
           <div class="avatar-wrapper">
             <img :src="user.avatar" alt="Avatar" class="avatar-img" />
             <div class="avatar-overlay">
-              <label for="avatarUpload" class="change-avatar-btn"> Thay ảnh</label>
+              <label for="avatarUpload" class="change-avatar-btn">Thay ảnh</label>
               <input type="file" id="avatarUpload" accept="image/*" @change="handleAvatarChange" hidden />
             </div>
           </div>
 
           <h3 class="username">{{ user.username || 'Người dùng' }}</h3>
           <p class="role">Vai trò: {{ user.role || 'Thành viên' }}</p>
-
-          <!-- Form cập nhật -->
           <form class="profile-form">
             <div class="form-group">
               <label>Tên người dùng</label>
@@ -83,9 +108,31 @@ const handleAvatarChange = (event) => {
               <input v-model="user.email" type="email" class="form-control" />
             </div>
 
+            <div class="form-group">
+              <label>Tuổi</label>
+              <input v-model="user.tuoi" type="number" min="0" class="form-control" />
+            </div>
+
+            <div class="form-group">
+              <label>Giới tính</label>
+              <select v-model="user.gioitinh" class="form-control">
+                <option value="">-- Chọn giới tính --</option>
+                <option value="Nam">Nam</option>
+                <option value="Nữ">Nữ</option>
+                <option value="Khác">Khác</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Sản phẩm mong muốn</label>
+              <input v-model="user.sanpham" type="text" class="form-control"
+                placeholder="VD: Áo Hoodie Loose, Quần jean, ..." />
+            </div>
+
             <div class="btn-group">
-              <button type="button" class="btn btn-update" @click="handleUpdate"> Cập nhật</button>
-              <button type="button" class="btn btn-logout" @click="handleLogout"> Đăng xuất</button>
+              <button type="button" class="btn btn-update" @click="handleSave">Lưu</button>
+              <button type="button" class="btn btn-delete" @click="handleDelete">Xoá</button>
+              <button type="button" class="btn btn-logout" @click="handleLogout">Đăng xuất</button>
             </div>
           </form>
         </div>
@@ -94,6 +141,7 @@ const handleAvatarChange = (event) => {
   </div>
 </template>
 
+
 <style scoped>
 .admin-wrapper {
   display: flex;
@@ -101,6 +149,7 @@ const handleAvatarChange = (event) => {
   background: #f1f3f6;
   font-family: 'Poppins', sans-serif;
 }
+
 .sidebar {
   width: 240px;
   background: linear-gradient(180deg, #007bff, #0dcaf0);
@@ -130,6 +179,7 @@ const handleAvatarChange = (event) => {
 .sidebar a:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
 .content-area {
   flex: 1;
   padding: 3rem;
@@ -151,6 +201,7 @@ const handleAvatarChange = (event) => {
   text-align: center;
   animation: fadeIn 0.5s ease;
 }
+
 .avatar-wrapper {
   position: relative;
   display: inline-block;
@@ -170,6 +221,7 @@ const handleAvatarChange = (event) => {
 .avatar-wrapper:hover .avatar-img {
   transform: scale(1.05);
 }
+
 .avatar-overlay {
   position: absolute;
   bottom: 0;
@@ -191,6 +243,7 @@ const handleAvatarChange = (event) => {
   font-size: 0.9rem;
   cursor: pointer;
 }
+
 .username {
   font-size: 1.4rem;
   font-weight: 600;
@@ -202,6 +255,7 @@ const handleAvatarChange = (event) => {
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
 }
+
 .profile-form {
   text-align: left;
 }
@@ -229,6 +283,7 @@ const handleAvatarChange = (event) => {
   border-color: #007bff;
   box-shadow: 0 0 5px rgba(13, 110, 253, 0.3);
 }
+
 .btn-group {
   display: flex;
   justify-content: space-between;
@@ -253,6 +308,15 @@ const handleAvatarChange = (event) => {
   background: linear-gradient(90deg, #0056d2, #0099cc);
 }
 
+.btn-delete {
+  background: #ffeeba;
+  color: #856404;
+}
+
+.btn-delete:hover {
+  background: #ffe08a;
+}
+
 .btn-logout {
   background: #f8d7da;
   color: #dc3545;
@@ -267,6 +331,7 @@ const handleAvatarChange = (event) => {
     opacity: 0;
     transform: translateY(15px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

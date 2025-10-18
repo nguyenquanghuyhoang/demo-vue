@@ -7,9 +7,9 @@
         >
             <header class="d-flex align-items-center justify-content-between mb-3">
                 <h1 class="h3 m-0">{{ title }}</h1>
-                <form class="d-none d-sm-flex" role="search">
+                <!-- <form class="d-none d-sm-flex" role="search">
                     <input class="form-control form-control-sm" type="search" placeholder="Search posts" />
-                </form>
+                </form> -->
             </header>
         </slot>
         <slot name="content">
