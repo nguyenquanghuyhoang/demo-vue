@@ -9,6 +9,9 @@ const categories = ref(["Áo hoodie", "Áo polo", "Áo sơ mi", "Áo thun"])
 const priceRange = ref([0, 500])
 const selectedCategory = ref("")
 const sortOption = ref("default")
+const currentPage = ref(1)
+const itemsPerPage = 6
+
 const loadProducts = async () => {
   try {
     const res = await axios.get("http://localhost:3000/products")
@@ -17,6 +20,9 @@ const loadProducts = async () => {
     console.error("Lỗi tải sản phẩm:", err)
   }
 }
+
+onMounted(loadProducts)
+
 const filteredProducts = computed(() => {
   return products.value
     .filter(
@@ -32,8 +38,17 @@ const filteredProducts = computed(() => {
       return 0
     })
 })
-
-onMounted(loadProducts)
+const totalPages = computed(() => Math.ceil(filteredProducts.value.length / itemsPerPage))
+const paginatedProducts = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return filteredProducts.value.slice(start, start + itemsPerPage)
+})
+const changePage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+}
 
 const goToDetail = (id) => {
   router.push(`/products/${id}`)
@@ -66,31 +81,18 @@ const goToDetail = (id) => {
       </div>
 
       <div class="row mt-4">
-
         <aside class="col-lg-3 col-md-4 col-12 mb-4">
           <div class="sidebar p-3 rounded shadow-sm bg-white">
             <h5 class="fw-bold mb-3">DUYỆT QUA</h5>
             <ul class="list-unstyled mb-4">
-              <li
-                v-for="c in categories"
-                :key="c"
-                class="category-item"
-                :class="{ active: selectedCategory === c }"
-                @click="selectedCategory = c"
-              >
+              <li v-for="c in categories" :key="c" class="category-item" :class="{ active: selectedCategory === c }"
+                @click="selectedCategory = c">
                 {{ c }}
               </li>
             </ul>
 
             <h5 class="fw-bold mb-2">LỌC THEO GIÁ</h5>
-            <input
-              type="range"
-              min="0"
-              max="500"
-              step="10"
-              v-model="priceRange[1]"
-              class="form-range"
-            />
+            <input type="range" min="0" max="500" step="10" v-model="priceRange[1]" class="form-range" />
             <p class="text-muted small">
               Giá: {{ priceRange[0] }}k – {{ priceRange[1] }}k
             </p>
@@ -107,31 +109,42 @@ const goToDetail = (id) => {
           </div>
 
           <div class="row g-4">
-            <div
-              v-for="p in filteredProducts"
-              :key="p.id"
-              class="col-12 col-sm-6 col-md-4 col-lg-4"
-            >
+            <div v-for="p in paginatedProducts" :key="p.id" class="col-12 col-sm-6 col-md-4 col-lg-4">
               <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                 <div class="position-relative">
                   <img :src="p.image" class="card-img-top" alt="" />
-                 
                 </div>
                 <div class="card-body">
                   <p class="text-uppercase small text-muted mb-1">{{ p.category }}</p>
                   <h6 class="fw-semibold">{{ p.title }}</h6>
-
                   <p class="fw-bold text-primary mb-2">
                     {{ p.price.toLocaleString() }}đ
                   </p>
 
                   <button class="btn btn-outline-primary w-100" @click="goToDetail(p.id)">
-                    Xem chi tiết 
+                    Xem chi tiết
                   </button>
                 </div>
               </div>
             </div>
           </div>
+          <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-4">
+            <ul class="pagination">
+              <li class="page-item" :class="{ disabled: currentPage === 1 }" @click="changePage(currentPage - 1)">
+                <a class="page-link" href="#">«</a>
+              </li>
+
+              <li v-for="page in totalPages" :key="page" class="page-item" :class="{ active: currentPage === page }"
+                @click="changePage(page)">
+                <a class="page-link" href="#">{{ page }}</a>
+              </li>
+
+              <li class="page-item" :class="{ disabled: currentPage === totalPages }"
+                @click="changePage(currentPage + 1)">
+                <a class="page-link" href="#">»</a>
+              </li>
+            </ul>
+          </nav>
         </div>
       </div>
     </section>
@@ -150,22 +163,26 @@ const goToDetail = (id) => {
   padding: 16px 0;
   color: white;
 }
+
 .navbar .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .left-nav {
   display: flex;
   align-items: center;
   gap: 24px;
 }
+
 .logo {
   font-size: 1.5rem;
   color: white;
   font-weight: 700;
   text-decoration: none;
 }
+
 .menu .link {
   color: white;
   text-decoration: none;
@@ -173,45 +190,71 @@ const goToDetail = (id) => {
   border-radius: 8px;
   transition: 0.3s;
 }
+
 .menu .link:hover,
 .menu .active {
   background: rgba(255, 255, 255, 0.25);
 }
+
 .sidebar {
   background: white;
 }
+
 .category-item {
   cursor: pointer;
   padding: 6px 0;
   transition: 0.2s;
 }
+
 .category-item:hover {
   color: #0097e6;
 }
+
 .category-item.active {
   font-weight: 600;
   color: #0097e6;
 }
 
+/* 🛍️ Sản phẩm */
 .card-img-top {
   height: 260px;
   object-fit: cover;
 }
-.discount-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: #e84118;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 50px;
-  font-size: 0.85rem;
-  font-weight: bold;
-}
+
 .card {
-  transition: all 0.3s;
+  transition: all 0.3s ease;
 }
+
 .card:hover {
   transform: translateY(-6px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.pagination {
+  gap: 6px;
+}
+
+.page-link {
+  color: #007bff;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  border: 1px solid #dee2e6;
+}
+
+.page-link:hover {
+  background-color: #007bff;
+  color: #fff;
+}
+
+.page-item.active .page-link {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: #fff;
+}
+
+.page-item.disabled .page-link {
+  color: #ccc;
+  pointer-events: none;
+  background-color: #f1f1f1;
 }
 </style>

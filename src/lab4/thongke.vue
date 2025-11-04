@@ -1,56 +1,70 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 
 const orders = ref([])
+const products = ref([])
 
-// 🧩 Hàm đọc toàn bộ đơn hàng từ localStorage
-function loadAllOrders() {
-  const allKeys = Object.keys(localStorage)
-  const allOrders = []
+async function loadAllOrders() {
+  try {
+    const [orderRes, productRes] = await Promise.all([
+      axios.get('http://localhost:3000/orders'),
+      axios.get('http://localhost:3000/products')
+    ])
 
-  allKeys.forEach((key) => {
-    if (key.startsWith('orders_')) {
-      try {
-        const userOrders = JSON.parse(localStorage.getItem(key)) || []
-        const ownerEmail = key.replace(/^orders_/, '')
-        userOrders.forEach((o) => {
-          allOrders.push({ ...o, _ownerEmail: ownerEmail })
-        })
-      } catch (e) {
-        console.error('Parse error:', key, e)
-      }
-    }
+    orders.value = orderRes.data || []
+    products.value = productRes.data || []
+  } catch (err) {
+    console.error('Lỗi tải dữ liệu:', err)
+  }
+}
 
-    if (key === 'guest_orders') {
-      const guest = JSON.parse(localStorage.getItem('guest_orders') || '[]')
-      guest.forEach((o) => allOrders.push({ ...o, _ownerEmail: 'guest' }))
+const summaryStats = computed(() => {
+  let totalRevenue = 0
+  let totalOrders = orders.value.length
+  let totalProductsSold = 0
+
+  orders.value.forEach((order) => {
+    totalRevenue += Number(order.total_amount) || 0
+    if (order.items) {
+      order.items.forEach((item) => {
+        totalProductsSold += item.quantity
+      })
     }
   })
 
-  orders.value = allOrders
-}
+  const totalStock = products.value.reduce((acc, p) => acc + (p.stock || 0), 0)
 
-// 🧮 Thống kê khách hàng
+  return {
+    totalRevenue,
+    totalOrders,
+    totalStock,
+    totalProductsSold
+  }
+})
 const customerStats = computed(() => {
   const statsMap = {}
 
   orders.value.forEach((order) => {
-    const email = order.email || order._ownerEmail || 'guest'
+    const email = order.email || 'guest'
+    const name = order.name || 'Chưa có tên'
+
     if (!statsMap[email]) {
       statsMap[email] = {
         email,
+        name,
         totalSpent: 0,
         orderCount: 0
       }
     }
-    statsMap[email].totalSpent += order.total_amount || 0
+
+    statsMap[email].totalSpent += Number(order.total_amount) || 0
     statsMap[email].orderCount += 1
   })
 
   return Object.values(statsMap).sort((a, b) => b.totalSpent - a.totalSpent)
 })
 
-// 🏆 Tính Top 5 sản phẩm bán chạy nhất
 const topProducts = computed(() => {
   const productStats = {}
 
@@ -81,9 +95,9 @@ onMounted(() => {
 })
 </script>
 
+
 <template>
   <div class="admin-wrapper">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <h3>Admin Panel</h3>
       <nav>
@@ -95,10 +109,26 @@ onMounted(() => {
         <RouterLink to="/postlist" active-class="active">Trang chủ</RouterLink>
       </nav>
     </aside>
-
-    <!-- Nội dung chính -->
     <main class="main-content">
-      <!-- Thống kê khách hàng -->
+      <h2 class="page-title">Thống kê Admin</h2>
+      <div class="summary-cards">
+        <div class="summary-card">
+          <h5>Tổng doanh thu</h5>
+          <p>{{ summaryStats.totalRevenue.toLocaleString() }} đ</p>
+        </div>
+        <div class="summary-card">
+          <h5>Tổng đơn hàng</h5>
+          <p>{{ summaryStats.totalOrders }}</p>
+        </div>
+        <div class="summary-card">
+          <h5>Tổng sản phẩm còn hàng</h5>
+          <p>{{ summaryStats.totalStock }}</p>
+        </div>
+        <div class="summary-card">
+          <h5>Sản phẩm đã bán (tổng)</h5>
+          <p>{{ summaryStats.totalProductsSold }}</p>
+        </div>
+      </div>
       <h2>Thống kê khách hàng</h2>
       <div class="card table-card">
         <div class="table-header">
@@ -110,6 +140,7 @@ onMounted(() => {
           <table>
             <thead>
               <tr>
+                <th>Tên khách hàng</th>
                 <th>Email</th>
                 <th>Số đơn hàng</th>
                 <th>Tổng chi tiêu</th>
@@ -117,6 +148,7 @@ onMounted(() => {
             </thead>
             <tbody>
               <tr v-for="customer in customerStats" :key="customer.email">
+                <td>{{ customer.name }}</td>
                 <td>{{ customer.email }}</td>
                 <td>{{ customer.orderCount }}</td>
                 <td class="price">{{ customer.totalSpent.toLocaleString() }} đ</td>
@@ -125,8 +157,6 @@ onMounted(() => {
           </table>
         </div>
       </div>
-
-      <!-- Top 5 sản phẩm bán chạy -->
       <h2>Top 5 sản phẩm bán chạy</h2>
       <div class="card table-card">
         <div class="table-header">
@@ -146,9 +176,7 @@ onMounted(() => {
             </thead>
             <tbody>
               <tr v-for="(p, index) in topProducts" :key="p.id">
-                <td>
-                  <img :src="p.image" alt="" class="thumb" />
-                </td>
+                <td><img :src="p.image" alt="" class="thumb" /></td>
                 <td><strong>{{ index + 1 }}. {{ p.title }}</strong></td>
                 <td>{{ p.totalSold }}</td>
                 <td class="price">{{ p.totalRevenue.toLocaleString() }} đ</td>
@@ -170,7 +198,6 @@ onMounted(() => {
   color: #333;
 }
 
-/* Sidebar */
 .sidebar {
   width: 230px;
   background: #ffffff;
@@ -180,20 +207,17 @@ onMounted(() => {
   flex-direction: column;
   border-right: 1px solid #e3e6ef;
 }
-
 .sidebar h3 {
   font-weight: 700;
   color: #3b5bdb;
   margin-bottom: 25px;
   text-align: center;
 }
-
 .sidebar nav {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .sidebar a {
   text-decoration: none;
   padding: 10px 15px;
@@ -202,27 +226,56 @@ onMounted(() => {
   color: #444;
   transition: all 0.2s;
 }
-
 .sidebar a:hover,
 .sidebar a.active {
   background-color: #3b5bdb;
   color: white;
 }
 
-/* Main content */
 .main-content {
   flex: 1;
   padding: 40px 50px;
   background: #f7f9fc;
 }
-
-.main-content h2 {
+.page-title {
   color: #2e59d9;
   font-weight: 700;
   margin-bottom: 25px;
 }
 
-/* Card */
+.summary-cards {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+.summary-card {
+  flex: 1;
+  min-width: 220px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease;
+}
+.summary-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+.summary-card h5 {
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 8px;
+}
+.summary-card p {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2e59d9;
+}
+
+/* Table */
 .card {
   background: white;
   border-radius: 14px;
@@ -230,20 +283,16 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   margin-bottom: 25px;
 }
-
-/* Table styles */
 .table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
 }
-
 .table-header h5 {
   color: #2e59d9;
   font-weight: 600;
 }
-
 .count {
   background: #edf1ff;
   color: #2e59d9;
@@ -251,18 +300,15 @@ onMounted(() => {
   border-radius: 10px;
   font-weight: 500;
 }
-
 .table-container {
   overflow-x: auto;
 }
-
 table {
   width: 100%;
   border-collapse: collapse;
   min-width: 700px;
   font-size: 15px;
 }
-
 th,
 td {
   padding: 10px 12px;
@@ -271,22 +317,18 @@ td {
   vertical-align: middle;
   white-space: nowrap;
 }
-
 th {
   background: #f3f6ff;
   font-weight: 600;
   color: #2e59d9;
 }
-
 tr:hover {
   background: #f9fbff;
 }
-
 .price {
   color: #e74a3b;
   font-weight: 600;
 }
-
 .thumb {
   width: 60px;
   height: 60px;

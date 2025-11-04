@@ -1,35 +1,22 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from "vue";
+import axios from "axios";
 
 const orders = ref([]);
 const selectedOrder = ref(null);
-function loadAllOrders() {
-  const allKeys = Object.keys(localStorage);
-  const allOrders = [];
-
-  allKeys.forEach((key) => {
-    if (key.startsWith("orders_")) {
-      try {
-        const userOrders = JSON.parse(localStorage.getItem(key)) || [];
-        const ownerEmail = key.replace(/^orders_/, "");
-        userOrders.forEach((o) => {
-          allOrders.push({ ...o, _ownerEmail: ownerEmail });
-        });
-      } catch (e) {
-        console.error("Parse orders key", key, e);
-      }
-    }
-
-    if (key === "guest_orders") {
-      const guest = JSON.parse(localStorage.getItem("guest_orders") || "[]");
-      guest.forEach((o) => allOrders.push({ ...o, _ownerEmail: "guest" }));
-    }
-  });
-  orders.value = allOrders.slice().sort((a, b) => {
-    const ta = a.id || new Date(a.date).getTime();
-    const tb = b.id || new Date(b.date).getTime();
-    return tb - ta;
-  });
+async function loadAllOrders() {
+  try {
+    const res = await axios.get("http://localhost:3000/orders");
+    orders.value = res.data
+      .slice()
+      .sort((a, b) => {
+        const ta = a.id || new Date(a.date).getTime();
+        const tb = b.id || new Date(b.date).getTime();
+        return tb - ta;
+      });
+  } catch (err) {
+    console.error("Lỗi khi tải đơn hàng từ server:", err);
+  }
 }
 
 onMounted(() => {
@@ -41,25 +28,32 @@ onBeforeUnmount(() => {
   window.removeEventListener("storage", loadAllOrders);
 });
 
-const updateStatus = (id, status) => {
-  const idx = orders.value.findIndex((o) => o.id === id);
+const updateStatus = async (id, status) => {
+  const idx = orders.value.findIndex((o) => o.id == id);
   if (idx === -1) return;
+
   orders.value[idx].status = status;
+  const order = { ...orders.value[idx] };
+  try {
+    const res = await axios.get(`http://localhost:3000/orders/${String(id)}`);
+    if (!res.data) {
+      alert("Không tìm thấy đơn hàng trên server!");
+      return;
+    }
+    const updatedOrder = { ...res.data, status };
+    await axios.patch(`http://localhost:3000/orders/${String(id)}`, updatedOrder);
 
-  const order = orders.value[idx];
-  const owner = order._ownerEmail || "guest";
-  const key = owner === "guest" ? "guest_orders" : `orders_${owner}`;
-  const list = JSON.parse(localStorage.getItem(key) || "[]");
-  const updated = list.map((o) => (o.id === id ? { ...o, status } : o));
-  localStorage.setItem(key, JSON.stringify(updated));
-
-  if (status === "Hoàn thành") {
-    reduceStockFromOrder(order);
+    if (status === "Hoàn thành") {
+      await reduceStockFromOrder(order);
+    }
+    alert("Trạng thái đơn hàng đã được lưu!");
+    await loadAllOrders();
+  } catch (e) {
+    console.error("Lỗi khi cập nhật trạng thái đơn hàng:", e);
+    alert("Không thể lưu thay đổi lên server!");
   }
-
-  loadAllOrders();
-  alert("Đã cập nhật trạng thái đơn hàng!");
 };
+
 
 const reduceStockFromOrder = async (order) => {
   try {
@@ -75,24 +69,23 @@ const reduceStockFromOrder = async (order) => {
         console.log(`Đã trừ ${item.quantity} khỏi ${product.title} → còn ${newStock}`);
       }
     }
-
     console.log("Đã cập nhật tồn kho trong JSON Server!");
   } catch (err) {
     console.error("Lỗi khi trừ tồn kho:", err);
   }
 };
 
-const deleteOrder = (id) => {
+const deleteOrder = async (id) => {
   if (!confirm("Bạn có chắc muốn xóa đơn hàng này không?")) return;
-  const order = orders.value.find((o) => o.id === id);
-  if (!order) return;
-  const owner = order._ownerEmail || "guest";
-  const key = owner === "guest" ? "guest_orders" : `orders_${owner}`;
-  const list = JSON.parse(localStorage.getItem(key) || "[]");
-  const updated = list.filter((o) => o.id !== id);
-  localStorage.setItem(key, JSON.stringify(updated));
-  loadAllOrders();
-  alert("Đã xóa đơn hàng!");
+
+  try {
+    await axios.delete(`http://localhost:3000/orders/${id}`);
+    console.log(`Đã xóa đơn ${id} trên server`);
+    loadAllOrders();
+    alert("Đã xóa đơn hàng!");
+  } catch (e) {
+    console.warn("Không tìm thấy đơn trong db.json, bỏ qua.");
+  }
 };
 
 const viewOrder = (order) => {
@@ -110,7 +103,7 @@ const viewOrder = (order) => {
         <RouterLink to="/quanliuser" active-class="active">Người dùng</RouterLink>
         <RouterLink to="/danhmuc" active-class="active">Danh mục</RouterLink>
         <RouterLink to="/orderAdmin" active-class="active">Quản lý đơn hàng</RouterLink>
-         <RouterLink to="/thongke" active-class="active">Thống kê</RouterLink>
+        <RouterLink to="/thongke" active-class="active">Thống kê</RouterLink>
         <RouterLink to="/postlist" active-class="active">Trang chủ</RouterLink>
       </nav>
     </aside>
@@ -142,8 +135,9 @@ const viewOrder = (order) => {
                 <td>{{ order.email || order._ownerEmail || 'guest' }}</td>
                 <td class="price">{{ order.total_amount?.toLocaleString() }} đ</td>
                 <td>
-                  <select v-model="order.status" class="form-select status-select"
+                  <select v-model="order.status" class="form-select status-select" :disabled="order.status === 'Đã hủy'"
                     @change="updateStatus(order.id, order.status)">
+
                     <option>Đặt hàng (COD)</option>
                     <option>Đang xử lý</option>
                     <option>Đang giao hàng</option>
@@ -170,7 +164,8 @@ const viewOrder = (order) => {
         <p><strong>Email:</strong> {{ selectedOrder.email }}</p>
         <p>
           <strong>Địa chỉ:</strong>
-          {{ selectedOrder.address?.ward }}, {{ selectedOrder.address?.district }}, {{ selectedOrder.address?.province }}
+          {{ selectedOrder.address?.ward }}, {{ selectedOrder.address?.district }}, {{ selectedOrder.address?.province
+          }}
         </p>
         <p><strong>Ghi chú:</strong> {{ selectedOrder.note || "(Không có)" }}</p>
 
@@ -191,8 +186,7 @@ const viewOrder = (order) => {
   </div>
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>
 
 
 <style scoped>
@@ -346,13 +340,13 @@ tr:hover {
 .btn-view,
 .btn-delete,
 .btn-close {
-  display: inline-flex;        
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;        
-  padding: 8px 14px;          
-  min-width: 40px;            
-  line-height: 1;             
+  white-space: nowrap;
+  padding: 8px 14px;
+  min-width: 40px;
+  line-height: 1;
   border: none;
   border-radius: 8px;
   background: #e9ecf5;
@@ -365,13 +359,16 @@ tr:hover {
   background: #dfe3f0;
 }
 
-.btn, .btn-view, .btn-delete {
+.btn,
+.btn-view,
+.btn-delete {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
 }
 
-.detail-card, .detail-card * {
+.detail-card,
+.detail-card * {
   word-break: normal !important;
   overflow-wrap: normal !important;
 }
@@ -442,4 +439,4 @@ tr:hover {
   color: #e74a3b;
   margin-top: 10px;
 }
-</style>
+</style> 

@@ -13,10 +13,10 @@ const product = reactive({
   image: '',
   category: '',
   description: '',
-  stock: 0 
+  stock: 0
 })
 const user = ref(null)
-let reloadInterval = null 
+let reloadInterval = null
 const LoadProducts = async () => {
   try {
     const res = await axios.get('http://localhost:3000/products', {
@@ -43,7 +43,6 @@ const LoadCategories = async () => {
     console.error('Không thể tải danh mục:', err)
   }
 }
-
 onMounted(async () => {
   const userData = localStorage.getItem('user')
   if (userData) {
@@ -58,23 +57,19 @@ onMounted(async () => {
     router.push('/login')
     return
   }
-
   await LoadProducts()
   await LoadCategories()
   reloadInterval = setInterval(() => {
     LoadProducts()
   }, 5000)
 })
-
 onBeforeUnmount(() => {
   if (reloadInterval) clearInterval(reloadInterval)
 })
-
 const handleSubmit = async () => {
   if (!product.title.trim()) return alert('Vui lòng nhập tên sản phẩm!')
   if (product.price <= 0) return alert('Giá phải lớn hơn 0!')
   if (product.stock < 0) return alert('Số lượng tồn không hợp lệ!')
-
   try {
     if (product.id) {
       await axios.put(`http://localhost:3000/products/${product.id}`, { ...product })
@@ -84,29 +79,27 @@ const handleSubmit = async () => {
       await axios.post('http://localhost:3000/products', newProduct)
       alert('Thêm mới thành công!')
     }
-
     clearForm()
     await LoadProducts()
     localStorage.setItem('products', JSON.stringify(products.value))
-    console.log("💾 Đã cập nhật localStorage sau khi thêm/sửa sản phẩm.")
-    
+    console.log("Đã cập nhật localStorage sau khi thêm/sửa sản phẩm.")
+
   } catch (err) {
     console.error(err)
   }
 }
-
 const handleDelete = async (id) => {
   if (confirm('Bạn có chắc muốn xóa sản phẩm này không?')) {
     await axios.delete(`http://localhost:3000/products/${id}`)
     LoadProducts()
+  }else {
+    alert('Đã hủy thao tác xóa.')
   }
 }
-
 const editProduct = (item) => {
   Object.assign(product, item)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
-
 const clearForm = () => {
   Object.assign(product, {
     id: '',
@@ -119,9 +112,6 @@ const clearForm = () => {
   })
 }
 </script>
-
-
-
 <template>
   <div class="admin-wrapper">
     <aside class="sidebar">
@@ -138,8 +128,6 @@ const clearForm = () => {
 
     <main class="main-content">
       <h2>Quản lý sản phẩm</h2>
-
-      <!-- Form thêm/sửa -->
       <div class="card form-card">
         <h5>{{ product.id ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới" }}</h5>
         <form @submit.prevent="handleSubmit">
@@ -155,13 +143,7 @@ const clearForm = () => {
             </select>
 
             <input v-model="product.image" placeholder="Link ảnh sản phẩm" required>
-            <input
-              v-model.number="product.stock"
-              type="number"
-              min="0"
-              placeholder="Số lượng tồn kho"
-              required
-            />
+            <input v-model.number="product.stock" type="number" min="0" placeholder="Số lượng tồn kho" required />
           </div>
 
           <textarea v-model="product.description" rows="3" placeholder="Mô tả sản phẩm..."></textarea>

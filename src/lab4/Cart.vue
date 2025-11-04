@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
+
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import axios from "axios";
@@ -26,10 +27,8 @@ const thanhtoan = async () => {
     return;
   }
 
-  // 💰 Tạo ID đơn hàng (dùng để đồng bộ với VNPay)
   const order_id = Math.floor(Math.random() * 1000000000000) + 1;
 
-  // 🧾 Dữ liệu đơn hàng chờ thanh toán VNPay
   const orderData = {
     id: order_id,
     email: user.email,
@@ -39,7 +38,6 @@ const thanhtoan = async () => {
     status: "Hoàn thành",
   };
 
-  // 🧠 Lưu tạm vào localStorage để khi VNPay trả về có thể tìm lại đơn
   const ordersKey = `orders_${user.email}`;
   const orders = JSON.parse(localStorage.getItem(ordersKey)) || [];
   orders.push(orderData);
@@ -47,13 +45,11 @@ const thanhtoan = async () => {
   localStorage.setItem("lastOrderId", order_id);
 
   try {
-    // 🔁 Gửi yêu cầu tạo link VNPay
     const response = await axios.post("http://localhost/vnpay/createPayment.php", {
-      order_id, // dùng ID này để đối chiếu khi VNPay trả về
+      order_id,
       amount: cartTotal.value + phiship.value.service_fee,
     });
 
-    // ✅ Nếu có link trả về, điều hướng sang trang thanh toán
     if (response.data) {
       window.location.href = response.data;
     } else {
@@ -200,7 +196,7 @@ const xacNhanThanhToan = async () => {
   }
 
   const newOrder = {
-    id: Date.now(),
+    id: String(Date.now()),
     name: checkoutForm.value.name,
     phone: checkoutForm.value.phone,
     email: checkoutForm.value.email,
@@ -232,6 +228,14 @@ const xacNhanThanhToan = async () => {
     guestOrders.push(newOrder);
     localStorage.setItem("guest_orders", JSON.stringify(guestOrders));
   }
+
+  try {
+    await axios.post("http://localhost:3000/orders", newOrder);
+    console.log("Đơn hàng đã được lưu vào db.json!");
+  } catch (err) {
+    console.error("Lỗi khi lưu đơn hàng vào db.json:", err);
+  }
+
   await updateProductStock();
 
   if (checkoutForm.value.paymentMethod === "vnpay") {
@@ -239,44 +243,51 @@ const xacNhanThanhToan = async () => {
   } else {
     alert("Đặt hàng thành công! Thanh toán khi nhận hàng.");
     clearCart();
+    const user = JSON.parse(localStorage.getItem("user"));
+    const cartKey = user && user.email ? `cart_${user.email}` : "cart";
+    localStorage.setItem(cartKey, JSON.stringify([]));
+
     router.push("/donhang");
   }
 };
 
-
+watch(
+  () => store.getters.cartItems,
+  (newCart) => {
+    const user = JSON.parse(localStorage.getItem("user"));
+    const cartKey = user && user.email ? `cart_${user.email}` : "cart";
+    localStorage.setItem(cartKey, JSON.stringify(newCart));
+  },
+  { deep: true }
+);
 onMounted(() => {
   loadTinh();
-
   const user = JSON.parse(localStorage.getItem("user"));
   const cartKey = user && user.email ? `cart_${user.email}` : "cart";
-  const savedCart = localStorage.getItem(cartKey);
+  const savedCart = JSON.parse(localStorage.getItem(cartKey) || "[]");
 
-  if (savedCart) {
-    const cart = JSON.parse(savedCart);
-    cart.forEach(item => store.commit("addToCart", item));
+  if (savedCart.length > 0) {
+    savedCart.forEach((item) => store.commit("addToCart", item));
   }
 });
 </script>
-
-
-
 <template>
   <header class="main-header">
-  <div class="nav-container">
-    <div class="left-nav">
-      <div class="logo" @click="$router.push('/')">
-        <span class="logo-text">Hoangsellclothes</span>
+    <div class="nav-container">
+      <div class="left-nav">
+        <div class="logo" @click="$router.push('/')">
+          <span class="logo-text">Hoangsellclothes</span>
+        </div>
+
+        <nav class="nav-links">
+          <RouterLink to="/" class="nav-item" active-class="active">Trang chủ</RouterLink>
+          <RouterLink to="/products" class="nav-item" active-class="active">Sản phẩm</RouterLink>
+        </nav>
       </div>
 
-      <nav class="nav-links">
-        <RouterLink to="/" class="nav-item" active-class="active">Trang chủ</RouterLink>
-        <RouterLink to="/products" class="nav-item" active-class="active">Sản phẩm</RouterLink>
-      </nav>
-    </div>
 
-   
-  </div>
-</header>
+    </div>
+  </header>
 
   <div class="container py-5">
     <h3 class="fw-bold mb-4 text-center text-primary">Giỏ hàng của bạn</h3>
@@ -335,7 +346,6 @@ onMounted(() => {
                 </select>
                 <small v-if="errors.province" class="text-danger">{{ errors.province }}</small>
               </div>
-
               <div class="col-12 col-md-4">
                 <select v-model="district_id" @change="loadXa()" :disabled="province_id == ''" class="form-select">
                   <option value="">-- Quận/Huyện --</option>
@@ -345,7 +355,6 @@ onMounted(() => {
                 </select>
                 <small v-if="errors.district" class="text-danger">{{ errors.district }}</small>
               </div>
-
               <div class="col-12 col-md-4">
                 <select v-model="ward_id" @change="loadPhi()" :disabled="district_id == ''" class="form-select">
                   <option value="">-- Xã/Phường --</option>
@@ -401,7 +410,7 @@ onMounted(() => {
         <button class="btn btn-primary px-4" type="button" @click="xacNhanThanhToan">Xác nhận thanh toán</button>
       </div>
 
-      
+
     </div>
   </div>
 </template>
@@ -476,6 +485,7 @@ table img {
     width: 100%;
   }
 }
+
 .main-header {
   background: linear-gradient(90deg, #007bff, #00b4ff);
   padding: 15px 40px;
@@ -485,6 +495,7 @@ table img {
   top: 0;
   z-index: 100;
 }
+
 .nav-container {
   display: flex;
   align-items: center;
@@ -506,6 +517,7 @@ table img {
   color: #fff;
   cursor: pointer;
 }
+
 .nav-links {
   display: flex;
   gap: 20px;
@@ -564,7 +576,7 @@ table img {
   background: white;
   color: #333;
   border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   display: none;
   flex-direction: column;
   min-width: 150px;
@@ -591,5 +603,4 @@ table img {
 .logout {
   color: red;
 }
-
 </style>

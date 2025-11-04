@@ -105,7 +105,7 @@ const handleAvatarChange = (event) => {
 
             <div class="form-group">
               <label>Email</label>
-              <input v-model="user.email" type="email" class="form-control" />
+              <input disabled v-model="user.email" type="email" class="form-control" />
             </div>
 
             <div class="form-group">

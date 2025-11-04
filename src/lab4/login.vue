@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import store from '@/store'
@@ -13,26 +13,34 @@ const isSuccess = ref(false)
 const checkLogin = async (username, password) => {
   try {
     const response = await axios.get('http://localhost:3000/users')
+    console.log('Dữ liệu user:', response.data)
+
     if (response.status === 200) {
       const user = response.data.find(
         (item) => item.username === username && item.password === password
       )
-      if (user) {
-        localStorage.setItem('user', JSON.stringify(user))
-        localStorage.setItem('token', user.token || '')
 
+      if (user) {
+        console.log('Người dùng hợp lệ:', user)
+        localStorage.setItem('user', JSON.stringify(user))
+        if (user.token) {
+          localStorage.setItem('token', user.token)
+        }
         store.commit('setUser', user)
-        const cartKey = `cart_${user.email}`
+        const cartKey = `cart_${user.username}`
         const savedCart = localStorage.getItem(cartKey)
+
         if (savedCart) {
           const cartItems = JSON.parse(savedCart)
-          cartItems.forEach(item => store.commit('addToCart', item))
-          console.log(`Đã load giỏ hàng cho ${user.email}`)
+          cartItems.forEach((item) => store.commit('addToCart', item))
+          console.log(`Đã load giỏ hàng cho ${user.username}`)
         } else {
-          console.log(`Giỏ hàng trống cho ${user.email}`)
+          console.log(`Giỏ hàng trống cho ${user.username}`)
         }
 
         return true
+      } else {
+        console.warn('Không tìm thấy user phù hợp')
       }
     }
   } catch (error) {
@@ -58,6 +66,8 @@ const handleDangNhap = async () => {
   if (login) {
     message.value = 'Đăng nhập thành công'
     isSuccess.value = true
+    console.log('Đăng nhập thành công, chuyển sang /postlist...')
+    await nextTick()
     router.push('/postlist')
   } else {
     message.value = 'Tên đăng nhập hoặc mật khẩu không đúng'
@@ -70,13 +80,24 @@ const handleDangKy = () => {
 }
 </script>
 
+
 <template>
   <div class="login-container">
     <div class="login-box">
       <h2>Đăng Nhập</h2>
       <form @submit.prevent="handleDangNhap">
-        <input type="text" v-model="username" placeholder="Tên đăng nhập" class="input-field" />
-        <input type="password" v-model="password" placeholder="Mật khẩu" class="input-field" />
+        <input
+          type="text"
+          v-model="username"
+          placeholder="Tên đăng nhập"
+          class="input-field"
+        />
+        <input
+          type="password"
+          v-model="password"
+          placeholder="Mật khẩu"
+          class="input-field"
+        />
         <button type="submit" class="btn-login">Đăng Nhập</button>
       </form>
 

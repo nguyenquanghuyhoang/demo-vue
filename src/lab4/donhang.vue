@@ -2,50 +2,55 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import axios from "axios";
 
 const router = useRouter();
 const store = useStore();
 const myOrders = ref([]);
 const selectedOrder = ref(null);
-
-// 🧩 Load đơn hàng từ localStorage cho người dùng hiện tại
-function loadOrdersForCurrentUser() {
+async function loadOrdersForCurrentUser() {
   const user = JSON.parse(localStorage.getItem("user"));
   if (!user || !user.email) {
     myOrders.value = [];
     return;
   }
-  const key = `orders_${user.email}`;
-  const userOrders = JSON.parse(localStorage.getItem(key) || "[]");
-  myOrders.value = userOrders.slice().sort((a, b) => {
-    const ta = a.id || new Date(a.date).getTime();
-    const tb = b.id || new Date(b.date).getTime();
-    return tb - ta;
-  });
+  try {
+    const res = await axios.get("http://localhost:3000/orders");
+    const dbOrders = res.data.filter((o) => o.email === user.email);
+    myOrders.value = dbOrders.slice().sort((a, b) => {
+      const ta = a.id || new Date(a.date).getTime();
+      const tb = b.id || new Date(b.date).getTime();
+      return tb - ta;
+    });
+  } catch (err) {
+    console.error("Lỗi khi tải đơn hàng từ db.json:", err);
+    myOrders.value = [];
+  }
 }
-
-// ✅ Hủy đơn hàng
-const cancelOrder = (order) => {
+const cancelOrder = async (order) => {
   const confirmCancel = confirm("Bạn có chắc muốn hủy đơn hàng này?");
   if (!confirmCancel) return;
-
   const user = JSON.parse(localStorage.getItem("user"));
   if (!user || !user.email) return;
+  try {
+    const res = await axios.get(`http://localhost:3000/orders/${order.id}`);
+    if (!res.data) {
+      alert("Không tìm thấy đơn hàng trên server!");
+      return;
+    }
+    await axios.patch(`http://localhost:3000/orders/${order.id}`, {
+      ...res.data,
+      status: "Đã hủy",
+    });
 
-  const key = `orders_${user.email}`;
-  const orders = JSON.parse(localStorage.getItem(key) || "[]");
-
-  const updatedOrders = orders.map((o) =>
-    o.id === order.id ? { ...o, status: "Đã hủy" } : o
-  );
-
-  localStorage.setItem(key, JSON.stringify(updatedOrders));
-  loadOrdersForCurrentUser();
-  selectedOrder.value = null;
-  alert("Đơn hàng đã được hủy!");
+    alert("Đơn hàng đã được hủy thành công!");
+    await loadOrdersForCurrentUser();
+    selectedOrder.value = null;
+  } catch (err) {
+    console.error("Lỗi khi cập nhật trạng thái đơn hàng:", err);
+    alert("Không thể hủy đơn hàng trên server (db.json).");
+  }
 };
-
-// 🧩 Mua lại đơn
 const reorder = (order) => {
   const user = JSON.parse(localStorage.getItem("user"));
   if (!user || !user.username) {
@@ -78,52 +83,35 @@ const reorder = (order) => {
 const viewOrder = (order) => {
   selectedOrder.value = order;
 };
-onMounted(() => {
- 
-  loadOrdersForCurrentUser();
+onMounted(async () => {
+  await loadOrdersForCurrentUser();
   window.addEventListener("storage", loadOrdersForCurrentUser);
 
-  // 🧾 Kiểm tra nếu VNPay trả về thành công (vnp_ResponseCode=00)
   const urlParams = new URLSearchParams(window.location.search);
   const vnp_ResponseCode = urlParams.get("vnp_ResponseCode");
-  const vnp_TxnRef = urlParams.get("vnp_TxnRef"); // ID đơn hàng
+  const vnp_TxnRef = urlParams.get("vnp_TxnRef"); 
 
   if (vnp_ResponseCode === "00" && vnp_TxnRef) {
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (user && user.email) {
-      const key = `orders_${user.email}`;
-      const orders = JSON.parse(localStorage.getItem(key) || "[]");
-
-      // 🔄 Cập nhật trạng thái đơn hàng thành "Đã thanh toán VNPay"
-      const updatedOrders = orders.map((order) =>
-        order.id == vnp_TxnRef
-          ? { ...order, status: "Đã thanh toán VNPay" }
-          : order
-      );
-
-      // 💾 Lưu lại localStorage
-      localStorage.setItem(key, JSON.stringify(updatedOrders));
-
-      // 🔁 Cập nhật danh sách hiển thị
-      myOrders.value = updatedOrders.slice().sort((a, b) => {
-        const ta = a.id || new Date(a.date).getTime();
-        const tb = b.id || new Date(b.date).getTime();
-        return tb - ta;
+    try {
+      await axios.patch(`http://localhost:3000/orders/${vnp_TxnRef}`, {
+        status: "Đã thanh toán VNPay",
       });
-
       alert("Thanh toán VNPay thành công! Đơn hàng đã được cập nhật.");
+      await loadOrdersForCurrentUser();
+    } catch (err) {
+      console.warn("Không thể cập nhật trạng thái VNPay lên db.json:", err);
     }
 
-    // 🚫 Xóa tham số trên URL để tránh cập nhật lại khi reload
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 });
-
 
 onBeforeUnmount(() => {
   window.removeEventListener("storage", loadOrdersForCurrentUser);
 });
 </script>
+
+
 
 <template>
   <div class="user-wrapper">
@@ -166,20 +154,16 @@ onBeforeUnmount(() => {
               </td>
               <td class="actions">
                 <button class="btn-view" @click="viewOrder(order)">Xem chi tiết</button>
-                <button
-                  v-if="order.status?.toLowerCase().includes('hoàn')"
-                  class="btn-reorder"
-                  @click="reorder(order)"
-                >
+                <button v-if="order.status?.toLowerCase().includes('hoàn')" class="btn-reorder" @click="reorder(order)">
                   Mua lại
                 </button>
-                <button
-                  v-if="order.status?.toLowerCase().includes('chờ')"
-                  class="btn-cancel"
-                  @click="cancelOrder(order)"
-                >
+                <button v-if="order.status &&
+                  (order.status.toLowerCase().includes('chờ') ||
+                    order.status.toLowerCase().includes('đang') ||
+                    order.status.toLowerCase().includes('đặt'))" class="btn-cancel" @click="cancelOrder(order)">
                   Hủy đơn
                 </button>
+
               </td>
             </tr>
           </tbody>
@@ -268,7 +252,7 @@ onBeforeUnmount(() => {
   background: #fff;
   border-radius: 16px;
   padding: 25px;
-  box-shadow: 0 4px 20px rgba( 0, 0, 0, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
 .order-table {
@@ -319,6 +303,7 @@ onBeforeUnmount(() => {
 .btn-view {
   background: #007bff;
 }
+
 .btn-view:hover {
   background: #0056d2;
 }
@@ -326,6 +311,7 @@ onBeforeUnmount(() => {
 .btn-reorder {
   background: #28a745;
 }
+
 .btn-reorder:hover {
   background: #218838;
 }
@@ -333,6 +319,7 @@ onBeforeUnmount(() => {
 .btn-cancel {
   background: #dc3545;
 }
+
 .btn-cancel:hover {
   background: #c82333;
 }
